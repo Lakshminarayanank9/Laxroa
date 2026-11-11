@@ -1,6 +1,6 @@
 # Laxroa (www.laxroa.co.in)
 
-Full-stack e-commerce monorepo: user site + admin panel (`/frontend`) and REST API (`/backend`).
+E-commerce project with a static storefront preview (`/frontend`) and REST API starter (`/backend`).
 
 ## Build progress
 - [x] Step 1: repo, backend server, database schema, seed
@@ -19,6 +19,12 @@ npx prisma migrate dev --name init
 npm run db:seed             # creates the admin user + sample products
 npm run dev                 # http://localhost:4000/api/health
 ```
+
+## Deploy the storefront to Vercel
+1. Import `https://github.com/Lakshminarayanank9/Laxroa` into Vercel.
+2. Keep the project root at the repository root and use the `Other` framework preset. `vercel.json` serves the static files from `frontend`.
+3. Deploy. The storefront is a static preview with sample products; customer accounts, product APIs, and checkout are not connected yet.
+4. Add `laxroa.co.in` under **Project Settings → Domains**. Follow the DNS records Vercel displays in GoDaddy, then wait for Vercel to verify the domain and issue HTTPS.
 
 ## Security notes
 - Never commit `.env` (it is in `.gitignore`). Only `.env.example` is committed.
