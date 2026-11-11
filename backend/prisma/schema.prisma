@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ImageKind {
+  GALLERY   // normal product photos
+  SPIN360   // ordered frames for the 360-degree viewer
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  CREATED
+  PAID
+  FAILED
+}
+
+model User {
+  id                String    @id @default(cuid())
+  name              String
+  email             String    @unique
+  passwordHash      String
+  role              Role      @default(USER)
+  resetTokenHash    String?   // SHA-256 of the emailed one-time token
+  resetTokenExpires DateTime? // token valid for 15 minutes
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  addresses Address[]
+  orders    Order[]
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  fullName  String
+  phone     String
+  line1     String
+  line2     String?
+  city      String
+  state     String
+  pincode   String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([userId])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String   @default("")
+  pricePaise  Int      // price in paise (Rs 499.00 = 49900) to avoid float errors
+  stock       Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  images     ProductImage[]
+  orderItems OrderItem[]
+}
+
+model ProductImage {
+  id        String    @id @default(cuid())
+  productId String
+  url       String
+  publicId  String?   // Cloudinary id, used for deleting
+  kind      ImageKind @default(GALLERY)
+  position  Int       @default(0) // frame order for SPIN360
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, kind, position])
+}
+
+model Order {
+  id                String        @id @default(cuid())
+  userId            String
+  addressId         String        // required: no order without an address
+  addressSnapshot   Json          // copy of the address at purchase time
+  status            OrderStatus   @default(PENDING_PAYMENT)
+  paymentStatus     PaymentStatus @default(CREATED)
+  totalPaise        Int
+  razorpayOrderId   String?       @unique
+  razorpayPaymentId String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  user    User        @relation(fields: [userId], references: [id])
+  address Address     @relation(fields: [addressId], references: [id])
+  items   OrderItem[]
+
+  @@index([userId])
+}
+
+model OrderItem {
+  id             String @id @default(cuid())
+  orderId        String
+  productId      String
+  name           String // snapshot
+  unitPricePaise Int    // price at time of purchase (admin price changes don't affect old orders)
+  quantity       Int
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+}
