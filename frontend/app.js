@@ -42,6 +42,7 @@ let isCreatingAdminProduct = false;
 let liveCatalogLoaded = false;
 let resetToken = new URLSearchParams(window.location.search).get('resetToken');
 let accountMode = new URLSearchParams(window.location.search).get('account');
+let currentAccountUser = null;
 let viewerFrames = [];
 let viewerFrameIndex = 0;
 let dragPosition = null;
@@ -529,6 +530,7 @@ function showAccountView(view) {
 }
 
 function showAccountProfile(user) {
+  currentAccountUser = user;
   document.querySelector('#open-account').textContent = 'My account';
   document.querySelector('#account-user').textContent = `Signed in as ${user.email}`;
   document.querySelector('#account-password-form').reset();
@@ -562,7 +564,7 @@ async function openAccount() {
   accountLoginStatus.textContent = 'Checking your account…';
   try {
     const response = await apiRequest('/api/auth/me');
-    showAccountProfile(response.user);
+    welcomeAccountUser(response.user, 'Welcome back. Explore the QIVRA store and enjoy shopping.');
   } catch (error) {
     if (error.status === 401) {
       accountLoginStatus.textContent = '';
@@ -576,6 +578,12 @@ async function openAccount() {
 document.querySelector('#open-account').addEventListener('click', openAccount);
 document.querySelector('#close-account').addEventListener('click', () => accountDialog.close());
 document.querySelector('#account-welcome-continue').addEventListener('click', () => accountWelcomeDialog.close());
+document.querySelector('#account-welcome-manage').addEventListener('click', () => {
+  if (!currentAccountUser) return;
+  accountWelcomeDialog.close();
+  accountDialog.showModal();
+  showAccountProfile(currentAccountUser);
+});
 accountDialog.addEventListener('click', (event) => {
   if (event.target === accountDialog) accountDialog.close();
 });
@@ -690,6 +698,7 @@ document.querySelector('#account-password-form').addEventListener('submit', asyn
 document.querySelector('#account-logout').addEventListener('click', async () => {
   try {
     await apiRequest('/api/auth/logout', { method: 'POST' });
+    currentAccountUser = null;
     document.querySelector('#open-account').textContent = 'Sign in';
     showAccountView('login');
     accountLoginStatus.textContent = 'You have signed out.';
