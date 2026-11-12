@@ -1,0 +1,156 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { env } from '../config/env.js';
+import { requireAdmin, requireUser } from '../middleware/auth.js';
+import { prisma } from '../lib/prisma.js';
+import { uploadProductImage } from '../lib/cloudinary.js';
+
+const router = Router();
+const maxImageBytes = 5 * 1024 * 1024;
+const imageSchema = z.object({
+  url: z.string().url().max(2048).refine((value) => {
+    try {
+      return ['http:', 'https:'].includes(new URL(value).protocol);
+    } catch {
+      return false;
+    }
+  }),
+  publicId: z.string().max(255).optional().nullable(),
+});
+const updateSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  description: z.string().max(2000).optional(),
+  pricePaise: z.number().int().min(0).max(100000000).optional(),
+  stock: z.number().int().min(0).max(1000000).optional(),
+  active: z.boolean().optional(),
+  gallery: z.array(imageSchema).max(20).optional(),
+  spin360: z.array(imageSchema).max(72).optional(),
+}).strict();
+const uploadSchema = z.object({
+  dataUrl: z.string().max(7_500_000),
+  fileName: z.string().trim().min(1).max(120),
+});
+const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+function includeProductImages() {
+  return {
+    images: {
+      orderBy: [{ kind: 'asc' }, { position: 'asc' }],
+      select: { id: true, url: true, publicId: true, kind: true, position: true },
+    },
+  };
+}
+
+router.use(requireUser, requireAdmin);
+
+router.get('/products', async (_req, res, next) => {
+  try {
+    const products = await prisma.product.findMany({
+      orderBy: { createdAt: 'asc' },
+      include: includeProductImages(),
+    });
+    res.json({ products });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/media', async (req, res, next) => {
+  try {
+    if (!env.cloudinaryReady) {
+      return res.status(503).json({ error: 'Image uploads are not configured. Add the Cloudinary environment variables first.' });
+    }
+
+    const { dataUrl, fileName } = uploadSchema.parse(req.body);
+    const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl);
+    if (!match || !allowedImageTypes.has(match[1])) {
+      return res.status(400).json({ error: 'Choose a JPEG, PNG, or WebP image.' });
+    }
+
+    const buffer = Buffer.from(match[2], 'base64');
+    if (buffer.length === 0 || buffer.length > maxImageBytes) {
+      return res.status(400).json({ error: 'Images must be smaller than 5 MB.' });
+    }
+
+    const image = await uploadProductImage(buffer, match[1], fileName);
+    return res.status(201).json({ image });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch('/products/:id', async (req, res, next) => {
+  try {
+    const changes = updateSchema.parse(req.body);
+    if (Object.keys(changes).length === 0) {
+      return res.status(400).json({ error: 'Provide at least one product field to update.' });
+    }
+
+    const { gallery, spin360, ...productChanges } = changes;
+    const product = await prisma.$transaction(async (transaction) => {
+      const existingProduct = await transaction.product.findUnique({
+        where: { id: req.params.id },
+        select: { id: true },
+      });
+      if (!existingProduct) {
+        const error = new Error('Product not found.');
+        error.status = 404;
+        throw error;
+      }
+
+      if (Object.keys(productChanges).length > 0) {
+        await transaction.product.update({
+          where: { id: req.params.id },
+          data: productChanges,
+        });
+      }
+
+      if (gallery !== undefined || spin360 !== undefined) {
+        const currentImages = await transaction.productImage.findMany({
+          where: { productId: req.params.id },
+          orderBy: [{ kind: 'asc' }, { position: 'asc' }],
+        });
+        const nextGallery = gallery ?? currentImages
+          .filter((image) => image.kind === 'GALLERY')
+          .map(({ url, publicId }) => ({ url, publicId }));
+        const nextSpin360 = spin360 ?? currentImages
+          .filter((image) => image.kind === 'SPIN360')
+          .map(({ url, publicId }) => ({ url, publicId }));
+
+        await transaction.productImage.deleteMany({ where: { productId: req.params.id } });
+        const nextImages = [
+          ...nextGallery.map((image, position) => ({
+            ...image,
+            productId: req.params.id,
+            kind: 'GALLERY',
+            position,
+          })),
+          ...nextSpin360.map((image, position) => ({
+            ...image,
+            productId: req.params.id,
+            kind: 'SPIN360',
+            position,
+          })),
+        ];
+        if (nextImages.length > 0) {
+          await transaction.productImage.createMany({ data: nextImages });
+        }
+      }
+
+      return transaction.product.findUnique({
+        where: { id: req.params.id },
+        include: includeProductImages(),
+      });
+    });
+
+    return res.json({ product });
+  } catch (error) {
+    if (error.code === 'P2025' && !error.status) {
+      error.status = 404;
+      error.message = 'Product not found.';
+    }
+    return next(error);
+  }
+});
+
+export default router;

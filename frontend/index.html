@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f5f2eb">
     <meta name="description" content="Discover the Laxroa collection of everyday essentials.">
+    <meta name="api-base-url" content="">
     <title>Laxroa — Everyday essentials</title>
     <link rel="stylesheet" href="./styles.css">
     <script src="./app.js" defer></script>
@@ -16,9 +17,12 @@
         <a href="#shop">Shop</a>
         <a href="#about">Our approach</a>
       </nav>
-      <button class="cart-button" id="open-cart" type="button" aria-haspopup="dialog">
-        Bag <span id="cart-count" class="cart-count" aria-live="polite">0</span>
-      </button>
+      <div class="header-actions">
+        <button class="admin-button" id="open-admin" type="button" aria-haspopup="dialog">Admin</button>
+        <button class="cart-button" id="open-cart" type="button" aria-haspopup="dialog">
+          Bag <span id="cart-count" class="cart-count" aria-live="polite">0</span>
+        </button>
+      </div>
     </header>
 
     <main>
@@ -52,7 +56,7 @@
             <p class="eyebrow">The first edit</p>
             <h2 id="collection-title">A few good things.</h2>
           </div>
-          <p class="sample-note">Sample products · Prices in INR</p>
+          <p class="sample-note" id="catalog-status" role="status">Sample products · Prices in INR</p>
         </div>
         <div class="product-grid" id="product-grid"></div>
       </section>
@@ -62,7 +66,7 @@
         <div class="about-copy">
           <p class="eyebrow">A note from Laxroa</p>
           <h2 id="about-title">A simple start.<br><em>More to come.</em></h2>
-          <p>This storefront is a preview. Product details, customer accounts, and checkout are not connected yet.</p>
+          <p>Product prices and images are managed from the admin panel. Checkout is not connected yet.</p>
         </div>
         <a class="text-link" href="#shop">Back to the collection <span aria-hidden="true">↑</span></a>
       </section>
@@ -88,6 +92,92 @@
         <p class="checkout-note" id="checkout-note" role="status">Checkout is not available in this preview.</p>
         <button class="button button-dark checkout-button" id="checkout-button" type="button">Continue to checkout</button>
       </div>
+    </dialog>
+
+    <dialog class="viewer-dialog" id="viewer-dialog" aria-labelledby="viewer-title">
+      <div class="viewer-header">
+        <div>
+          <p class="eyebrow">Product detail</p>
+          <h2 id="viewer-title">360° view</h2>
+        </div>
+        <button class="icon-button" id="close-viewer" type="button" aria-label="Close 360 degree view">×</button>
+      </div>
+      <div class="viewer-stage" id="viewer-stage" tabindex="0" aria-label="Drag horizontally or use the arrow keys to rotate">
+        <img id="viewer-image" alt="">
+      </div>
+      <div class="viewer-controls">
+        <button class="icon-button" id="viewer-previous" type="button" aria-label="Previous view">‹</button>
+        <p id="viewer-counter" aria-live="polite"></p>
+        <button class="icon-button" id="viewer-next" type="button" aria-label="Next view">›</button>
+      </div>
+      <p class="viewer-hint">Drag the product or use the arrows to rotate.</p>
+    </dialog>
+
+    <dialog class="admin-dialog" id="admin-dialog" aria-labelledby="admin-title">
+      <div class="admin-header">
+        <div>
+          <p class="eyebrow">Laxroa management</p>
+          <h2 id="admin-title">Product admin</h2>
+        </div>
+        <button class="icon-button" id="close-admin" type="button" aria-label="Close admin panel">×</button>
+      </div>
+      <section id="admin-login-section">
+        <p class="admin-intro">Sign in with the admin account configured for this store.</p>
+        <form class="admin-form" id="admin-login-form">
+          <label>Email
+            <input id="admin-email" name="email" type="email" autocomplete="username" required>
+          </label>
+          <label>Password
+            <input id="admin-password" name="password" type="password" autocomplete="current-password" required>
+          </label>
+          <button class="button button-dark" type="submit">Sign in</button>
+          <p class="admin-status" id="admin-login-status" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+      <section id="admin-editor-section" hidden>
+        <div class="admin-toolbar">
+          <p id="admin-user"></p>
+          <button class="text-button" id="admin-logout" type="button">Sign out</button>
+        </div>
+        <label class="admin-product-select">Choose a product
+          <select id="admin-product-select"></select>
+        </label>
+        <form class="admin-form" id="admin-product-form">
+          <label>Product name
+            <input id="admin-name" name="name" type="text" maxlength="120" required>
+          </label>
+          <label>Description
+            <textarea id="admin-description" name="description" rows="3" maxlength="2000"></textarea>
+          </label>
+          <div class="admin-fields-row">
+            <label>Price (INR)
+              <input id="admin-price" name="price" type="number" min="0" step="0.01" required>
+            </label>
+            <label>Stock
+              <input id="admin-stock" name="stock" type="number" min="0" step="1" required>
+            </label>
+          </div>
+          <label class="admin-checkbox">
+            <input id="admin-active" name="active" type="checkbox">
+            Visible in the storefront
+          </label>
+          <fieldset class="admin-image-section">
+            <legend>Main product image</legend>
+            <img class="admin-cover-preview" id="admin-cover-preview" alt="Current main product image" hidden>
+            <p class="admin-help" id="admin-cover-empty">No main image uploaded yet.</p>
+            <input id="admin-cover-input" type="file" accept="image/jpeg,image/png,image/webp">
+            <p class="admin-help">JPEG, PNG, or WebP; maximum 5 MB.</p>
+          </fieldset>
+          <fieldset class="admin-image-section">
+            <legend>360° image frames</legend>
+            <p class="admin-help">Choose numbered images in rotation order (for example 001.jpg, 002.jpg).</p>
+            <input id="admin-spin-input" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+            <ol class="admin-spin-list" id="admin-spin-list"></ol>
+          </fieldset>
+          <button class="button button-dark" id="admin-save" type="submit">Save product</button>
+          <p class="admin-status" id="admin-editor-status" role="status" aria-live="polite"></p>
+        </form>
+      </section>
     </dialog>
   </body>
 </html>
