@@ -78,6 +78,7 @@ const adminSpinList = document.querySelector('#admin-spin-list');
 const adminCoverPreview = document.querySelector('#admin-cover-preview');
 const adminCoverEmpty = document.querySelector('#admin-cover-empty');
 const accountDialog = document.querySelector('#account-dialog');
+const accountWelcomeDialog = document.querySelector('#account-welcome-dialog');
 const accountLoginStatus = document.querySelector('#account-login-status');
 const accountRegisterStatus = document.querySelector('#account-register-status');
 const accountForgotStatus = document.querySelector('#account-forgot-status');
@@ -535,6 +536,13 @@ function showAccountProfile(user) {
   showAccountView('profile');
 }
 
+function welcomeAccountUser(user, message) {
+  showAccountProfile(user);
+  document.querySelector('#account-welcome-message').textContent = message;
+  accountDialog.close();
+  accountWelcomeDialog.showModal();
+}
+
 async function openAccount() {
   accountDialog.showModal();
   if (resetToken) {
@@ -567,8 +575,12 @@ async function openAccount() {
 
 document.querySelector('#open-account').addEventListener('click', openAccount);
 document.querySelector('#close-account').addEventListener('click', () => accountDialog.close());
+document.querySelector('#account-welcome-continue').addEventListener('click', () => accountWelcomeDialog.close());
 accountDialog.addEventListener('click', (event) => {
   if (event.target === accountDialog) accountDialog.close();
+});
+accountWelcomeDialog.addEventListener('click', (event) => {
+  if (event.target === accountWelcomeDialog) accountWelcomeDialog.close();
 });
 document.querySelectorAll('[data-account-show]').forEach((button) => {
   button.addEventListener('click', () => {
@@ -592,7 +604,7 @@ document.querySelector('#account-login-form').addEventListener('submit', async (
       }),
     });
     form.reset();
-    showAccountProfile(response.user);
+    welcomeAccountUser(response.user, 'You are signed in. Welcome back, and enjoy shopping at QIVRA.');
   } catch (error) {
     accountLoginStatus.textContent = error.message;
   }
@@ -612,7 +624,7 @@ document.querySelector('#account-register-form').addEventListener('submit', asyn
       }),
     });
     form.reset();
-    showAccountProfile(response.user);
+    welcomeAccountUser(response.user, 'Your account is ready. Welcome to QIVRA and enjoy shopping.');
   } catch (error) {
     accountRegisterStatus.textContent = error.message;
   }

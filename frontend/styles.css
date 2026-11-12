@@ -936,6 +936,25 @@ h1 em,
   width: min(520px, calc(100% - 32px));
 }
 
+.account-welcome-dialog {
+  text-align: center;
+}
+
+.account-welcome-dialog h2 {
+  margin: 10px 0 0;
+  font-family: var(--serif);
+  font-size: 1.8rem;
+  font-weight: 500;
+}
+
+.account-welcome-dialog .admin-intro {
+  margin: 14px 0 22px;
+}
+
+.account-welcome-dialog .button {
+  width: 100%;
+}
+
 .account-links,
 .admin-product-actions {
   display: flex;
