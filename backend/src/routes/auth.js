@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { env } from '../config/env.js';
+import { adminEmail } from '../config/admin.js';
 import { requireUser } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import { createPasswordResetToken, hashPasswordResetToken } from '../lib/password-reset.js';
@@ -226,18 +227,17 @@ router.post('/forgot-password', async (req, res, next) => {
 
 router.post('/forgot-user-id', async (_req, res, next) => {
   try {
-    if (!env.passwordResetReady || !env.ADMIN_EMAIL) {
+    if (!env.passwordResetReady) {
       return res.status(503).json({
         error: 'Admin ID reminder email is not configured on the backend.',
       });
     }
 
-    const email = env.ADMIN_EMAIL.toLowerCase();
     const admin = await prisma.user.findFirst({
-      where: { email, role: 'ADMIN' },
-      select: { id: true },
+      where: { email: adminEmail, role: 'ADMIN' },
+      select: { email: true },
     });
-    if (admin) await sendAdminUserIdEmail(email);
+    if (admin) await sendAdminUserIdEmail(admin.email);
 
     return res.status(202).json({
       message: 'If the admin account is configured, its user ID reminder will be emailed to the registered admin address.',

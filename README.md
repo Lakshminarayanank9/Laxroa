@@ -15,7 +15,7 @@ E-commerce project with a static storefront (`/frontend`) and REST API (`/backen
 - Admin sign-in: https://www.qivra.co.in/admin
 - Sign in with the account created by `npm run db:seed`.
 - Admins can change their password while signed in or request an email reset from the admin sign-in screen.
-- The configured `ADMIN_EMAIL` is the single admin sign-in ID. The admin sign-in screen can email this ID to the configured address using **Forgot user ID?**.
+- The administrator email is the single admin sign-in ID. The admin sign-in screen can email this ID to that address using **Forgot user ID?**.
 - Admins can add products, update a product's name, description, current price, optional original price, stock, visibility, main image, and 360-degree frames.
 - Products with order history are removed from the storefront but retained for those orders. Products with no order history can be deleted.
 - The customer storefront has no admin link; use the separate `/admin` URL.
@@ -33,14 +33,14 @@ E-commerce project with a static storefront (`/frontend`) and REST API (`/backen
 ## Checkout
 - Guest checkout collects a delivery name, phone number, and Indian postal address; customers do not need an account.
 - Orders are priced from the live database and reserve available stock. They remain pending until an admin calls the customer, enters the delivery charge, and accepts the order. The customer pays the confirmed total on delivery.
-- Configure `ADMIN_EMAIL` and `ADMIN_PASSWORD`, run `npm run db:seed` once, and use that admin account to replace the sample products with real inventory before accepting orders. Seeding demotes any other admin accounts so only the configured account remains an admin.
+- Set `ADMIN_PASSWORD`, run `npm run db:seed` once, and use the admin account to replace the sample products with real inventory before accepting orders. Seeding demotes any other admin accounts so only the configured account remains an admin.
 - Online payments are not enabled.
 
 ## Run the backend locally
 ```bash
 cd backend
 cp .env.example .env        # PowerShell: Copy-Item .env.example .env
-# Fill in DATABASE_URL, a unique JWT_SECRET, ADMIN_EMAIL, and ADMIN_PASSWORD.
+# Fill in DATABASE_URL, a unique JWT_SECRET, and ADMIN_PASSWORD.
 # Add Cloudinary values to enable image uploads and Resend values for reset emails.
 npm install
 npm run db:generate
@@ -55,7 +55,7 @@ For the local storefront, serve the `frontend` folder (for example on `http://lo
 1. Import `https://github.com/Lakshminarayanank9/Laxroa` into Vercel.
 2. Set **Root Directory** to the repository root (`./` or blank), not `backend`, and use the `Other` framework preset. `vercel.json` serves the static files from `frontend`.
 3. Deploy the storefront. The `api-base-url` meta tag in `frontend/index.html` points to `https://laxroa-api.onrender.com`; the page uses preview products if the API is unavailable.
-4. Deploy `backend` as a separate Node.js service and configure `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGINS`, `FRONTEND_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and all three Cloudinary variables. Add `EMAIL_API_KEY` and a verified `EMAIL_FROM` sender to enable password reset emails. Run `npm run db:deploy` and `npm run db:seed` once against the production database.
+4. Deploy `backend` as a separate Node.js service and configure `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGINS`, `FRONTEND_URL`, `ADMIN_PASSWORD`, and all three Cloudinary variables. Add `EMAIL_API_KEY` and a verified `EMAIL_FROM` sender to enable password reset emails. Run `npm run db:deploy` and `npm run db:seed` once against the production database.
 5. Add an API custom domain (recommended: `api.qivra.co.in`) using the exact DNS instructions from the backend host. After the custom API domain has verified and HTTPS works, update the `api-base-url` meta tag in `frontend/index.html` to that URL and redeploy the storefront. Until then, keep using the Render URL above.
 6. Add `www.qivra.co.in` and `qivra.co.in` under **Project Settings → Domains**. Follow the exact DNS records Vercel displays in GoDaddy; preserve unrelated MX/TXT records. Wait for Vercel to verify the domain and issue HTTPS.
 

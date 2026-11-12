@@ -1,13 +1,14 @@
 import 'dotenv/config';
 import bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
+import { adminEmail } from '../src/config/admin.js';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const email = process.env.ADMIN_EMAIL;
+  const email = adminEmail;
   const password = process.env.ADMIN_PASSWORD;
-  if (!email || !password) throw new Error('Set ADMIN_EMAIL and ADMIN_PASSWORD in .env');
+  if (!password) throw new Error('Set ADMIN_PASSWORD in .env');
 
   const passwordHash = await bcrypt.hash(password, 12);
   await prisma.user.updateMany({
