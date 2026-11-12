@@ -1,12 +1,13 @@
 :root {
   color-scheme: light;
-  --ink: #1d2925;
-  --muted: #737b72;
-  --paper: #f5f2eb;
+  --ink: #25231f;
+  --muted: #77736a;
+  --paper: #f7f5f0;
   --white: #fffefa;
-  --line: #dedbd2;
-  --green: #314c40;
-  --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --line: #e2ded5;
+  --green: #465448;
+  --accent: #a77b45;
+  --serif: "Bodoni 72", Didot, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   --sans: "Segoe UI", Arial, sans-serif;
 }
 
@@ -73,7 +74,7 @@ button {
 
 .main-nav a:hover,
 .text-link:hover {
-  color: #a75f43;
+  color: var(--accent);
 }
 
 .header-actions {
@@ -84,6 +85,7 @@ button {
 }
 
 .admin-button,
+.account-button,
 .text-button {
   padding: 8px 0;
   border: 0;
@@ -94,8 +96,18 @@ button {
 }
 
 .admin-button:hover,
+.account-button:hover,
 .text-button:hover {
-  color: #a75f43;
+  color: var(--accent);
+}
+
+.account-button {
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: #4e5851;
+  cursor: pointer;
+  font-size: 0.78rem;
 }
 
 .cart-button {
@@ -147,7 +159,7 @@ button {
   height: 7px;
   margin-right: 8px;
   border-radius: 50%;
-  background: #b36b4c;
+  background: var(--accent);
   vertical-align: 1px;
 }
 
@@ -169,7 +181,7 @@ h1,
 
 h1 em,
 .about h2 em {
-  color: #9c624a;
+  color: var(--accent);
   font-weight: 500;
 }
 
@@ -373,6 +385,11 @@ h1 em,
 
 .product-card {
   min-width: 0;
+  transition: transform 180ms ease;
+}
+
+.product-card:hover {
+  transform: translateY(-3px);
 }
 
 .product-art {
@@ -426,6 +443,11 @@ h1 em,
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 500ms ease;
+}
+
+.product-art:hover .product-photo {
+  transform: scale(1.035);
 }
 
 .spin-button {
@@ -506,6 +528,32 @@ h1 em,
   padding-top: 1px;
   font-size: 0.82rem;
   font-weight: 600;
+}
+
+.product-price-group {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+
+.product-price-compare {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 400;
+  text-decoration: line-through;
+}
+
+.product-discount {
+  position: absolute;
+  z-index: 1;
+  top: 13px;
+  right: 13px;
+  padding: 7px 9px;
+  background: rgba(37, 35, 31, 0.9);
+  color: #fffefa;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .add-button {
@@ -884,6 +932,34 @@ h1 em,
   width: min(680px, calc(100% - 32px));
 }
 
+.account-dialog {
+  width: min(520px, calc(100% - 32px));
+}
+
+.account-links,
+.admin-product-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.admin-product-actions {
+  margin: 22px 0;
+}
+
+.admin-product-actions .button {
+  min-height: 42px;
+}
+
+.account-section-title {
+  margin: 4px 0 0;
+  font-family: var(--serif);
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
 body.admin-route .site-header,
 body.admin-route main,
 body.admin-route .site-footer {
@@ -928,6 +1004,22 @@ body.admin-route #admin-dialog::backdrop {
 
 .admin-toolbar p {
   margin: 0;
+}
+
+.admin-password-panel {
+  margin: 18px 0 24px;
+  padding: 14px;
+  border: 1px solid var(--line);
+}
+
+.admin-password-panel summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.admin-password-panel[open] summary {
+  margin-bottom: 12px;
 }
 
 .admin-orders {
@@ -1171,6 +1263,10 @@ body.admin-route #admin-dialog::backdrop {
     display: none;
   }
 
+  .header-actions {
+    gap: 14px;
+  }
+
   .hero {
     grid-template-columns: 1fr;
     padding: 44px 6% 60px;
@@ -1249,6 +1345,12 @@ body.admin-route #admin-dialog::backdrop {
   .cart-footer {
     right: 22px;
     left: 22px;
+  }
+
+  .account-links,
+  .admin-product-actions {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 

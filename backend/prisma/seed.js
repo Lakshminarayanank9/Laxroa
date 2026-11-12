@@ -13,7 +13,7 @@ async function main() {
   await prisma.user.upsert({
     where: { email },
     update: { role: 'ADMIN' },
-    create: { name: 'Laxroa Admin', email, passwordHash, role: 'ADMIN' },
+    create: { name: 'QIVRA Admin', email, passwordHash, role: 'ADMIN' },
   });
 
   const products = [

@@ -4,28 +4,15 @@ import { env } from '../config/env.js';
 import { requireAdmin, requireUser } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import { uploadProductImage } from '../lib/cloudinary.js';
+import {
+  createProductSchema,
+  hasValidCompareAtPrice,
+  slugifyProductName,
+  updateProductSchema,
+} from '../lib/product-admin.js';
 
 const router = Router();
 const maxImageBytes = 5 * 1024 * 1024;
-const imageSchema = z.object({
-  url: z.string().url().max(2048).refine((value) => {
-    try {
-      return ['http:', 'https:'].includes(new URL(value).protocol);
-    } catch {
-      return false;
-    }
-  }),
-  publicId: z.string().max(255).optional().nullable(),
-});
-const updateSchema = z.object({
-  name: z.string().trim().min(1).max(120).optional(),
-  description: z.string().max(2000).optional(),
-  pricePaise: z.number().int().min(0).max(100000000).optional(),
-  stock: z.number().int().min(0).max(1000000).optional(),
-  active: z.boolean().optional(),
-  gallery: z.array(imageSchema).max(20).optional(),
-  spin360: z.array(imageSchema).max(72).optional(),
-}).strict();
 const uploadSchema = z.object({
   dataUrl: z.string().max(7_500_000),
   fileName: z.string().trim().min(1).max(120),
@@ -52,6 +39,89 @@ router.get('/products', async (_req, res, next) => {
     res.json({ products });
   } catch (error) {
     next(error);
+  }
+});
+
+router.post('/products', async (req, res, next) => {
+  try {
+    const changes = createProductSchema.parse(req.body);
+    if (!hasValidCompareAtPrice(changes.pricePaise, changes.compareAtPricePaise)) {
+      return res.status(400).json({ error: 'The original price must be greater than the current price.' });
+    }
+
+    const product = await prisma.$transaction(async (transaction) => {
+      const { gallery, spin360, ...productChanges } = changes;
+      const baseSlug = slugifyProductName(changes.name);
+      let slug = baseSlug;
+      let suffix = 1;
+      while (await transaction.product.findUnique({ where: { slug }, select: { id: true } })) {
+        suffix += 1;
+        slug = `${baseSlug}-${suffix}`;
+      }
+
+      const images = [
+        ...gallery.map((image, position) => ({
+          ...image,
+          kind: 'GALLERY',
+          position,
+        })),
+        ...spin360.map((image, position) => ({
+          ...image,
+          kind: 'SPIN360',
+          position,
+        })),
+      ];
+      return transaction.product.create({
+        data: {
+          ...productChanges,
+          slug,
+          images: { create: images },
+        },
+        include: includeProductImages(),
+      });
+    });
+
+    return res.status(201).json({ product });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.delete('/products/:id', async (req, res, next) => {
+  try {
+    const result = await prisma.$transaction(async (transaction) => {
+      const existingProduct = await transaction.product.findUnique({
+        where: { id: req.params.id },
+        select: { id: true },
+      });
+      if (!existingProduct) {
+        const error = new Error('Product not found.');
+        error.status = 404;
+        throw error;
+      }
+
+      const orderCount = await transaction.orderItem.count({
+        where: { productId: req.params.id },
+      });
+      if (orderCount > 0) {
+        await transaction.product.update({
+          where: { id: req.params.id },
+          data: { active: false },
+        });
+        return { archived: true };
+      }
+
+      await transaction.product.delete({ where: { id: req.params.id } });
+      return { archived: false };
+    });
+
+    return res.json({ productId: req.params.id, ...result });
+  } catch (error) {
+    if (error.code === 'P2003') {
+      error.status = 409;
+      error.message = 'This product has order history and can only be removed from the storefront.';
+    }
+    return next(error);
   }
 });
 
@@ -232,7 +302,7 @@ router.post('/media', async (req, res, next) => {
 
 router.patch('/products/:id', async (req, res, next) => {
   try {
-    const changes = updateSchema.parse(req.body);
+    const changes = updateProductSchema.parse(req.body);
     if (Object.keys(changes).length === 0) {
       return res.status(400).json({ error: 'Provide at least one product field to update.' });
     }
@@ -241,11 +311,21 @@ router.patch('/products/:id', async (req, res, next) => {
     const product = await prisma.$transaction(async (transaction) => {
       const existingProduct = await transaction.product.findUnique({
         where: { id: req.params.id },
-        select: { id: true },
+        select: { id: true, pricePaise: true, compareAtPricePaise: true },
       });
       if (!existingProduct) {
         const error = new Error('Product not found.');
         error.status = 404;
+        throw error;
+      }
+
+      const nextPrice = productChanges.pricePaise ?? existingProduct.pricePaise;
+      const nextCompareAtPrice = productChanges.compareAtPricePaise === undefined
+        ? existingProduct.compareAtPricePaise
+        : productChanges.compareAtPricePaise;
+      if (!hasValidCompareAtPrice(nextPrice, nextCompareAtPrice)) {
+        const error = new Error('The original price must be greater than the current price.');
+        error.status = 400;
         throw error;
       }
 

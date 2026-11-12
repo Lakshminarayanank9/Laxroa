@@ -12,6 +12,12 @@ import orderRoutes from './routes/orders.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
+const authRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 const orderRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 10,
@@ -36,7 +42,7 @@ app.use(cookieParser());
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: true, legacyHeaders: false }));
 
 app.use('/api/health', healthRoutes);
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authRateLimit, authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/orders', orderRateLimit, orderRoutes);

@@ -38,7 +38,10 @@ let currentGallery = [];
 let currentSpinFrames = [];
 let activeAdminProductId = '';
 let adminFormDirty = false;
+let isCreatingAdminProduct = false;
 let liveCatalogLoaded = false;
+let resetToken = new URLSearchParams(window.location.search).get('resetToken');
+let accountMode = new URLSearchParams(window.location.search).get('account');
 let viewerFrames = [];
 let viewerFrameIndex = 0;
 let dragPosition = null;
@@ -74,6 +77,12 @@ const adminOrdersList = document.querySelector('#admin-orders-list');
 const adminSpinList = document.querySelector('#admin-spin-list');
 const adminCoverPreview = document.querySelector('#admin-cover-preview');
 const adminCoverEmpty = document.querySelector('#admin-cover-empty');
+const accountDialog = document.querySelector('#account-dialog');
+const accountLoginStatus = document.querySelector('#account-login-status');
+const accountRegisterStatus = document.querySelector('#account-register-status');
+const accountForgotStatus = document.querySelector('#account-forgot-status');
+const accountResetStatus = document.querySelector('#account-reset-status');
+const accountPasswordStatus = document.querySelector('#account-password-status');
 
 if (isAdminRoute) document.body.classList.add('admin-route');
 
@@ -123,7 +132,9 @@ async function apiRequest(path, options = {}) {
   }
 
   if (!response.ok) {
-    throw new Error(data?.error || `The request failed (${response.status}).`);
+    const error = new Error(data?.error || `The request failed (${response.status}).`);
+    error.status = response.status;
+    throw error;
   }
   return data;
 }
@@ -150,6 +161,11 @@ function renderProducts() {
     const coverUrl = safeHttpUrl(gallery[0]?.url);
     const frames = imagesFor(product, 'SPIN360').filter((frame) => safeHttpUrl(frame.url));
     const noStock = Number.isFinite(product.stock) && product.stock <= 0;
+    const compareAtPrice = Number(product.compareAtPricePaise);
+    const hasDiscount = Number.isFinite(compareAtPrice) && compareAtPrice > product.pricePaise;
+    const discountPercent = hasDiscount
+      ? Math.max(1, Math.round((1 - product.pricePaise / compareAtPrice) * 100))
+      : 0;
     return `
       <article class="product-card">
         <div class="product-art ${productArtClass(product, index)}${coverUrl ? ' has-image' : ''}">
@@ -159,13 +175,17 @@ function renderProducts() {
           ${frames.length >= 2
             ? `<button class="spin-button" type="button" data-view360="${escapeHtml(product.id)}">360° view</button>`
             : ''}
+          ${hasDiscount ? `<span class="product-discount">${discountPercent}% off</span>` : ''}
         </div>
         <div class="product-info">
           <div>
             <h3>${escapeHtml(product.name)}</h3>
             <p>${escapeHtml(product.description)}</p>
           </div>
-          <span class="product-price">${currency.format((product.pricePaise || 0) / 100)}</span>
+          <div class="product-price-group">
+            <span class="product-price">${currency.format((product.pricePaise || 0) / 100)}</span>
+            ${hasDiscount ? `<span class="product-price-compare">${currency.format(compareAtPrice / 100)}</span>` : ''}
+          </div>
         </div>
         <button class="add-button" type="button" data-add="${escapeHtml(product.id)}" ${noStock ? 'disabled' : ''}>
           ${noStock ? 'Out of stock' : 'Add to bag'}
@@ -242,7 +262,7 @@ async function loadProducts() {
     catalogStatus.textContent = 'Live catalog · Prices in INR';
     heroNote.textContent = products.length === 0
       ? 'Our first collection is coming soon.'
-      : 'Explore the Laxroa collection.';
+      : 'Explore the QIVRA collection.';
   } catch (error) {
     products = [...sampleProducts];
     liveCatalogLoaded = false;
@@ -300,7 +320,10 @@ function renderAdminSpinFrames() {
 }
 
 function setAdminUploadPending(pending) {
-  adminProductSelect.disabled = pending;
+  adminProductSelect.disabled = pending || isCreatingAdminProduct || adminProducts.length === 0;
+  document.querySelector('#admin-add-product').disabled = pending;
+  document.querySelector('#admin-delete-product').disabled =
+    pending || isCreatingAdminProduct || !activeAdminProductId;
   document.querySelector('#admin-cover-input').disabled = pending;
   document.querySelector('#admin-spin-input').disabled = pending;
   document.querySelector('#admin-save').disabled = pending;
@@ -309,19 +332,37 @@ function setAdminUploadPending(pending) {
 function selectAdminProduct(productId) {
   const product = adminProducts.find((item) => item.id === productId);
   if (!product) {
-    adminEditorStatus.textContent = 'No products are available to edit.';
+    activeAdminProductId = '';
+    adminProductForm.reset();
+    document.querySelector('#admin-stock').value = '0';
+    document.querySelector('#admin-active').checked = true;
+    currentGallery = [];
+    currentSpinFrames = [];
+    adminFormDirty = false;
+    adminEditorStatus.textContent = 'No products are available yet. Add your first product above.';
+    document.querySelector('#admin-delete-product').disabled = true;
+    document.querySelector('#admin-save').textContent = 'Save product';
+    updateAdminCover();
+    renderAdminSpinFrames();
     return;
   }
 
+  isCreatingAdminProduct = false;
   activeAdminProductId = product.id;
   document.querySelector('#admin-name').value = product.name;
   document.querySelector('#admin-description').value = product.description || '';
   document.querySelector('#admin-price').value = (product.pricePaise / 100).toFixed(2).replace(/\.00$/, '');
+  document.querySelector('#admin-compare-at-price').value = product.compareAtPricePaise == null
+    ? ''
+    : (product.compareAtPricePaise / 100).toFixed(2).replace(/\.00$/, '');
   document.querySelector('#admin-stock').value = String(product.stock);
   document.querySelector('#admin-active').checked = product.active;
   currentGallery = imagesFor(product, 'GALLERY').map(({ url, publicId }) => ({ url, publicId }));
   currentSpinFrames = imagesFor(product, 'SPIN360').map(({ url, publicId }) => ({ url, publicId }));
   adminFormDirty = false;
+  adminProductSelect.disabled = false;
+  document.querySelector('#admin-delete-product').disabled = false;
+  document.querySelector('#admin-save').textContent = 'Save product';
   adminEditorStatus.textContent = '';
   updateAdminCover();
   renderAdminSpinFrames();
@@ -335,7 +376,26 @@ function renderAdminProducts(selectedId) {
     ? selectedId
     : adminProducts[0]?.id;
   adminProductSelect.value = nextId || '';
+  adminProductSelect.disabled = isCreatingAdminProduct || adminProducts.length === 0;
   selectAdminProduct(nextId);
+}
+
+function startCreatingAdminProduct() {
+  if (adminFormDirty && !window.confirm('Discard unsaved product changes?')) return;
+  isCreatingAdminProduct = true;
+  activeAdminProductId = '';
+  adminProductForm.reset();
+  document.querySelector('#admin-stock').value = '0';
+  document.querySelector('#admin-active').checked = true;
+  document.querySelector('#admin-save').textContent = 'Create product';
+  document.querySelector('#admin-delete-product').disabled = true;
+  adminProductSelect.disabled = true;
+  adminFormDirty = false;
+  currentGallery = [];
+  currentSpinFrames = [];
+  adminEditorStatus.textContent = 'Add the product details, then create the product.';
+  updateAdminCover();
+  renderAdminSpinFrames();
 }
 
 async function loadAdminProducts() {
@@ -349,7 +409,7 @@ async function loadAdminProducts() {
   catalogStatus.textContent = 'Live catalog · Prices in INR';
   heroNote.textContent = products.length === 0
     ? 'Our first collection is coming soon.'
-    : 'Explore the Laxroa collection.';
+    : 'Explore the QIVRA collection.';
   renderProducts();
   renderCart();
   renderAdminProducts(activeAdminProductId);
@@ -453,6 +513,179 @@ async function openAdmin() {
   }
 }
 
+function showAccountView(view) {
+  for (const section of document.querySelectorAll('[data-account-view]')) {
+    section.hidden = section.dataset.accountView !== view;
+  }
+  const titles = {
+    login: 'Welcome back',
+    register: 'Create your account',
+    forgot: 'Reset your password',
+    reset: 'Choose a new password',
+    profile: 'Your account',
+  };
+  document.querySelector('#account-title').textContent = titles[view];
+}
+
+function showAccountProfile(user) {
+  document.querySelector('#open-account').textContent = 'My account';
+  document.querySelector('#account-user').textContent = `Signed in as ${user.email}`;
+  document.querySelector('#account-password-form').reset();
+  accountPasswordStatus.textContent = '';
+  showAccountView('profile');
+}
+
+async function openAccount() {
+  accountDialog.showModal();
+  if (resetToken) {
+    accountResetStatus.textContent = '';
+    showAccountView('reset');
+    return;
+  }
+  if (accountMode === 'forgot') {
+    accountMode = null;
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.hash}`);
+    accountForgotStatus.textContent = '';
+    showAccountView('forgot');
+    return;
+  }
+
+  showAccountView('login');
+  accountLoginStatus.textContent = 'Checking your account…';
+  try {
+    const response = await apiRequest('/api/auth/me');
+    showAccountProfile(response.user);
+  } catch (error) {
+    if (error.status === 401) {
+      accountLoginStatus.textContent = '';
+    } else {
+      accountLoginStatus.textContent = error.message;
+    }
+    document.querySelector('#open-account').textContent = 'Sign in';
+  }
+}
+
+document.querySelector('#open-account').addEventListener('click', openAccount);
+document.querySelector('#close-account').addEventListener('click', () => accountDialog.close());
+accountDialog.addEventListener('click', (event) => {
+  if (event.target === accountDialog) accountDialog.close();
+});
+document.querySelectorAll('[data-account-show]').forEach((button) => {
+  button.addEventListener('click', () => {
+    showAccountView(button.dataset.accountShow);
+    accountLoginStatus.textContent = '';
+    accountRegisterStatus.textContent = '';
+    accountForgotStatus.textContent = '';
+  });
+});
+
+document.querySelector('#account-login-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  accountLoginStatus.textContent = 'Signing in…';
+  try {
+    const response = await apiRequest('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: form.elements.email.value,
+        password: form.elements.password.value,
+      }),
+    });
+    form.reset();
+    showAccountProfile(response.user);
+  } catch (error) {
+    accountLoginStatus.textContent = error.message;
+  }
+});
+
+document.querySelector('#account-register-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  accountRegisterStatus.textContent = 'Creating your account…';
+  try {
+    const response = await apiRequest('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: form.elements.name.value,
+        email: form.elements.email.value,
+        password: form.elements.password.value,
+      }),
+    });
+    form.reset();
+    showAccountProfile(response.user);
+  } catch (error) {
+    accountRegisterStatus.textContent = error.message;
+  }
+});
+
+document.querySelector('#account-forgot-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  accountForgotStatus.textContent = 'Requesting a reset link…';
+  try {
+    const response = await apiRequest('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email: form.elements.email.value }),
+    });
+    accountForgotStatus.textContent = response.message;
+  } catch (error) {
+    accountForgotStatus.textContent = error.message;
+  }
+});
+
+document.querySelector('#account-reset-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  if (!resetToken) {
+    accountResetStatus.textContent = 'This password reset link is invalid or has expired.';
+    return;
+  }
+  accountResetStatus.textContent = 'Resetting your password…';
+  try {
+    const response = await apiRequest('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token: resetToken, password: form.elements.password.value }),
+    });
+    resetToken = null;
+    form.reset();
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.hash}`);
+    showAccountView('login');
+    accountLoginStatus.textContent = response.message;
+  } catch (error) {
+    accountResetStatus.textContent = error.message;
+  }
+});
+
+document.querySelector('#account-password-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  accountPasswordStatus.textContent = 'Updating your password…';
+  try {
+    const response = await apiRequest('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        currentPassword: form.elements.currentPassword.value,
+        newPassword: form.elements.newPassword.value,
+      }),
+    });
+    showAccountProfile(response.user);
+    accountPasswordStatus.textContent = 'Your password has been updated.';
+  } catch (error) {
+    accountPasswordStatus.textContent = error.message;
+  }
+});
+
+document.querySelector('#account-logout').addEventListener('click', async () => {
+  try {
+    await apiRequest('/api/auth/logout', { method: 'POST' });
+    document.querySelector('#open-account').textContent = 'Sign in';
+    showAccountView('login');
+    accountLoginStatus.textContent = 'You have signed out.';
+  } catch (error) {
+    accountPasswordStatus.textContent = error.message;
+  }
+});
+
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -489,6 +722,10 @@ function parsePricePaise(value) {
     throw new Error('Enter a price of ₹1,000,000 or less.');
   }
   return pricePaise;
+}
+
+function parseOptionalPricePaise(value) {
+  return value.trim() === '' ? null : parsePricePaise(value);
 }
 
 productGrid.addEventListener('click', (event) => {
@@ -634,6 +871,26 @@ document.querySelector('#admin-logout').addEventListener('click', async () => {
   }
 });
 
+document.querySelector('#admin-password-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const status = document.querySelector('#admin-password-status');
+  status.textContent = 'Updating your password…';
+  try {
+    await apiRequest('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({
+        currentPassword: form.elements.currentPassword.value,
+        newPassword: form.elements.newPassword.value,
+      }),
+    });
+    form.reset();
+    status.textContent = 'Your password has been updated.';
+  } catch (error) {
+    status.textContent = error.message;
+  }
+});
+
 document.querySelector('#refresh-orders').addEventListener('click', async () => {
   try {
     await loadAdminOrders();
@@ -693,6 +950,32 @@ adminProductSelect.addEventListener('change', () => {
     return;
   }
   selectAdminProduct(adminProductSelect.value);
+});
+
+document.querySelector('#admin-add-product').addEventListener('click', startCreatingAdminProduct);
+
+document.querySelector('#admin-delete-product').addEventListener('click', async () => {
+  const product = adminProducts.find((item) => item.id === activeAdminProductId);
+  if (!product || !window.confirm(`Remove "${product.name}" from the storefront? Products with order history will be archived.`)) {
+    return;
+  }
+
+  const button = document.querySelector('#admin-delete-product');
+  button.disabled = true;
+  adminEditorStatus.textContent = 'Removing product…';
+  try {
+    const result = await apiRequest(`/api/admin/products/${encodeURIComponent(product.id)}`, {
+      method: 'DELETE',
+    });
+    isCreatingAdminProduct = false;
+    await loadAdminProducts();
+    adminEditorStatus.textContent = result.archived
+      ? 'Product removed from the storefront. Its order history has been preserved.'
+      : 'Product removed.';
+  } catch (error) {
+    adminEditorStatus.textContent = error.message;
+    button.disabled = false;
+  }
 });
 
 adminProductForm.addEventListener('input', () => {
@@ -781,23 +1064,33 @@ adminProductForm.addEventListener('submit', async (event) => {
       name: document.querySelector('#admin-name').value.trim(),
       description: document.querySelector('#admin-description').value,
       pricePaise: parsePricePaise(document.querySelector('#admin-price').value),
+      compareAtPricePaise: parseOptionalPricePaise(document.querySelector('#admin-compare-at-price').value),
       stock: Number(document.querySelector('#admin-stock').value),
       active: document.querySelector('#admin-active').checked,
       gallery: currentGallery,
       spin360: currentSpinFrames,
     };
-    const response = await apiRequest(`/api/admin/products/${encodeURIComponent(activeAdminProductId)}`, {
-      method: 'PATCH',
-      body: JSON.stringify(changes),
-    });
-    adminProducts = adminProducts.map((product) =>
-      product.id === response.product.id ? response.product : product
+    if (changes.compareAtPricePaise !== null && changes.compareAtPricePaise <= changes.pricePaise) {
+      throw new Error('The original price must be greater than the current price.');
+    }
+    const response = await apiRequest(
+      isCreatingAdminProduct
+        ? '/api/admin/products'
+        : `/api/admin/products/${encodeURIComponent(activeAdminProductId)}`,
+      {
+        method: isCreatingAdminProduct ? 'POST' : 'PATCH',
+        body: JSON.stringify(changes),
+      }
     );
+    isCreatingAdminProduct = false;
+    adminProducts = adminProducts.some((product) => product.id === response.product.id)
+      ? adminProducts.map((product) => product.id === response.product.id ? response.product : product)
+      : [...adminProducts, response.product];
     products = adminProducts.filter((product) => product.active);
     renderProducts();
     renderCart();
     renderAdminProducts(response.product.id);
-    adminEditorStatus.textContent = 'Product saved and published.';
+    adminEditorStatus.textContent = 'Product saved.';
   } catch (error) {
     adminEditorStatus.textContent = error.message;
   } finally {
@@ -842,5 +1135,6 @@ renderCart();
 if (isAdminRoute) {
   openAdmin();
 } else {
+  if (resetToken || accountMode === 'forgot') openAccount();
   loadProducts();
 }

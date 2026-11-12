@@ -23,9 +23,14 @@ export async function requireUser(req, res, next) {
   try {
     const user = await prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, name: true, role: true },
+      select: { id: true, email: true, name: true, role: true, sessionVersion: true },
     });
     if (!user) return res.status(401).json({ error: 'Please sign in.' });
+    const tokenVersion = typeof payload.sessionVersion === 'number' ? payload.sessionVersion : 0;
+    if (tokenVersion !== user.sessionVersion) {
+      return res.status(401).json({ error: 'Your session has expired. Please sign in again.' });
+    }
+    delete user.sessionVersion;
     req.user = user;
     return next();
   } catch (error) {

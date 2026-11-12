@@ -1,0 +1,5 @@
+ALTER TABLE "User"
+ADD COLUMN "sessionVersion" INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE "Product"
+ADD COLUMN "compareAtPricePaise" INTEGER;

@@ -44,6 +44,7 @@ model User {
   email             String    @unique
   passwordHash      String
   role              Role      @default(USER)
+  sessionVersion    Int       @default(0)
   resetTokenHash    String?   // SHA-256 of the emailed one-time token
   resetTokenExpires DateTime? // token valid for 15 minutes
   createdAt         DateTime  @default(now())
@@ -78,6 +79,7 @@ model Product {
   slug        String   @unique
   description String   @default("")
   pricePaise  Int      // price in paise (Rs 499.00 = 49900) to avoid float errors
+  compareAtPricePaise Int?
   stock       Int      @default(0)
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
