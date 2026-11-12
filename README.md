@@ -35,9 +35,9 @@ For the local storefront, serve the `frontend` folder (for example on `http://lo
 ## Deploy the storefront to Vercel
 1. Import `https://github.com/Lakshminarayanank9/Laxroa` into Vercel.
 2. Set **Root Directory** to the repository root (`./` or blank), not `backend`, and use the `Other` framework preset. `vercel.json` serves the static files from `frontend`.
-3. Deploy the storefront. If the API is not yet configured, the page explicitly displays preview products and admin changes will not save.
+3. Deploy the storefront. The `api-base-url` meta tag in `frontend/index.html` points to `https://laxroa-api.onrender.com`; the page uses preview products if the API is unavailable.
 4. Deploy `backend` as a separate Node.js service and configure `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGINS`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and all three Cloudinary variables. Run `npm run db:deploy` and `npm run db:seed` once against the production database.
-5. Add an API custom domain (recommended: `api.laxroa.co.in`) using the exact DNS instructions from the backend host. Set the `api-base-url` meta tag in `frontend/index.html` to that HTTPS API URL, then redeploy the storefront.
+5. Add an API custom domain (recommended: `api.laxroa.co.in`) using the exact DNS instructions from the backend host. After the custom API domain has verified and HTTPS works, update the `api-base-url` meta tag in `frontend/index.html` to that URL and redeploy the storefront. Until then, keep using the Render URL above.
 6. Add `www.laxroa.co.in` and `laxroa.co.in` under **Project Settings → Domains**. Follow the exact DNS records Vercel displays in GoDaddy; preserve unrelated MX/TXT records. Wait for Vercel to verify the domain and issue HTTPS.
 
 ## Security notes
