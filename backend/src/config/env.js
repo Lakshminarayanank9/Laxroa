@@ -8,6 +8,7 @@ const schema = z.object({
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   CORS_ORIGINS: z.string().default('http://localhost:3000'),
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
+  ADMIN_EMAIL: z.string().email().default('kanagarajnarayanan5@gmail.com'),
   EMAIL_API_KEY: z.string().default(''),
   EMAIL_FROM: z.string().default(''),
   CLOUDINARY_CLOUD_NAME: z.string().default(''),

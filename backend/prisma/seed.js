@@ -10,10 +10,14 @@ async function main() {
   if (!email || !password) throw new Error('Set ADMIN_EMAIL and ADMIN_PASSWORD in .env');
 
   const passwordHash = await bcrypt.hash(password, 12);
+  await prisma.user.updateMany({
+    where: { role: 'ADMIN', email: { not: email.toLowerCase() } },
+    data: { role: 'USER' },
+  });
   await prisma.user.upsert({
-    where: { email },
+    where: { email: email.toLowerCase() },
     update: { role: 'ADMIN' },
-    create: { name: 'QIVRA Admin', email, passwordHash, role: 'ADMIN' },
+    create: { name: 'QIVRA Admin', email: email.toLowerCase(), passwordHash, role: 'ADMIN' },
   });
 
   const products = [

@@ -859,6 +859,17 @@ document.querySelector('#admin-login-form').addEventListener('submit', async (ev
   }
 });
 
+document.querySelector('#admin-forgot-user-id').addEventListener('click', async () => {
+  const status = document.querySelector('#admin-forgot-user-id-status');
+  status.textContent = 'Requesting a user ID reminder…';
+  try {
+    const response = await apiRequest('/api/auth/forgot-user-id', { method: 'POST' });
+    status.textContent = response.message;
+  } catch (error) {
+    status.textContent = error.message;
+  }
+});
+
 document.querySelector('#admin-logout').addEventListener('click', async () => {
   try {
     await apiRequest('/api/auth/logout', { method: 'POST' });

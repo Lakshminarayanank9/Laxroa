@@ -85,6 +85,27 @@ async function sendPasswordResetEmail(email, resetUrl) {
   }
 }
 
+async function sendAdminUserIdEmail(email) {
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.EMAIL_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: env.EMAIL_FROM,
+      to: [email],
+      subject: 'Your QIVRA admin sign-in ID',
+      text: `Your QIVRA admin sign-in ID is ${email}. If you did not request this reminder, you can ignore this email.`,
+      html: `<p>Your QIVRA admin sign-in ID is <strong>${email}</strong>.</p><p>If you did not request this reminder, you can ignore this email.</p>`,
+    }),
+  });
+  if (!response.ok) {
+    console.error(`Admin user ID email delivery failed with status ${response.status}.`);
+    throw httpError(502, 'The user ID reminder could not be sent. Please try again later.');
+  }
+}
+
 router.post('/register', async (req, res, next) => {
   try {
     const { name, email, password } = registerSchema.parse(req.body);
@@ -198,6 +219,29 @@ router.post('/forgot-password', async (req, res, next) => {
     }
 
     return res.status(202).json({ message: 'If an account exists for that email, a reset link will be sent.' });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/forgot-user-id', async (_req, res, next) => {
+  try {
+    if (!env.passwordResetReady || !env.ADMIN_EMAIL) {
+      return res.status(503).json({
+        error: 'Admin ID reminder email is not configured on the backend.',
+      });
+    }
+
+    const email = env.ADMIN_EMAIL.toLowerCase();
+    const admin = await prisma.user.findFirst({
+      where: { email, role: 'ADMIN' },
+      select: { id: true },
+    });
+    if (admin) await sendAdminUserIdEmail(email);
+
+    return res.status(202).json({
+      message: 'If the admin account is configured, its user ID reminder will be emailed to the registered admin address.',
+    });
   } catch (error) {
     return next(error);
   }
