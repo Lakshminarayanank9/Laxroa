@@ -18,6 +18,7 @@ enum ImageKind {
 }
 
 enum OrderStatus {
+  PENDING_CONFIRMATION
   PENDING_PAYMENT
   PAID
   PROCESSING
@@ -30,6 +31,11 @@ enum PaymentStatus {
   CREATED
   PAID
   FAILED
+}
+
+enum PaymentMethod {
+  COD
+  RAZORPAY
 }
 
 model User {
@@ -96,19 +102,21 @@ model ProductImage {
 
 model Order {
   id                String        @id @default(cuid())
-  userId            String
-  addressId         String        // required: no order without an address
+  userId            String?
+  addressId         String?
   addressSnapshot   Json          // copy of the address at purchase time
   status            OrderStatus   @default(PENDING_PAYMENT)
   paymentStatus     PaymentStatus @default(CREATED)
+  paymentMethod     PaymentMethod @default(RAZORPAY)
+  deliveryFeePaise  Int           @default(0)
   totalPaise        Int
   razorpayOrderId   String?       @unique
   razorpayPaymentId String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
-  user    User        @relation(fields: [userId], references: [id])
-  address Address     @relation(fields: [addressId], references: [id])
+  user    User?       @relation(fields: [userId], references: [id])
+  address Address?    @relation(fields: [addressId], references: [id])
   items   OrderItem[]
 
   @@index([userId])

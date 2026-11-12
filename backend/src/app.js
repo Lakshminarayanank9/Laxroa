@@ -8,9 +8,16 @@ import healthRoutes from './routes/health.js';
 import authRoutes from './routes/auth.js';
 import productRoutes from './routes/products.js';
 import adminRoutes from './routes/admin.js';
+import orderRoutes from './routes/orders.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
+const orderRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 app.set('trust proxy', 1); // behind Render/Vercel/nginx
 app.use(helmet());
@@ -32,6 +39,7 @@ app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/orders', orderRateLimit, orderRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

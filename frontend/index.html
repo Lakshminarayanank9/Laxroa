@@ -34,7 +34,7 @@
             A first look at Laxroa. Browse a small selection of essentials, chosen for the everyday.
           </p>
           <a class="button button-dark" href="#shop">Explore the collection <span aria-hidden="true">↘</span></a>
-          <p class="hero-note">A preview collection with sample products</p>
+          <p class="hero-note" id="hero-note">Our first collection is coming soon.</p>
         </div>
         <div class="hero-art" aria-hidden="true">
           <div class="art-sun"></div>
@@ -66,7 +66,7 @@
         <div class="about-copy">
           <p class="eyebrow">A note from Laxroa</p>
           <h2 id="about-title">A simple start.<br><em>More to come.</em></h2>
-          <p>Product prices and images are managed from the admin panel. Checkout is not connected yet.</p>
+          <p>Place a cash-on-delivery order; we’ll call to confirm the delivery charge and final total.</p>
         </div>
         <a class="text-link" href="#shop">Back to the collection <span aria-hidden="true">↑</span></a>
       </section>
@@ -89,9 +89,53 @@
       <div class="cart-items" id="cart-items"></div>
       <div class="cart-footer">
         <div class="cart-subtotal"><span>Subtotal</span><strong id="cart-subtotal">₹0</strong></div>
-        <p class="checkout-note" id="checkout-note" role="status">Checkout is not available in this preview.</p>
+        <p class="checkout-note" id="checkout-note" role="status">We’ll call to confirm the delivery charge and final total.</p>
         <button class="button button-dark checkout-button" id="checkout-button" type="button">Continue to checkout</button>
       </div>
+    </dialog>
+
+    <dialog class="admin-dialog checkout-dialog" id="checkout-dialog" aria-labelledby="checkout-title">
+      <div class="admin-header">
+        <div>
+          <p class="eyebrow">Cash on delivery</p>
+          <h2 id="checkout-title">Delivery details</h2>
+        </div>
+        <button class="icon-button" id="close-checkout" type="button" aria-label="Close checkout">×</button>
+      </div>
+      <p class="checkout-intro">We’ll call to confirm the delivery charge and final total before accepting your order. Payment is due on delivery after confirmation.</p>
+      <div class="checkout-summary" id="checkout-summary"></div>
+      <form class="admin-form" id="checkout-form">
+        <label>Full name
+          <input id="checkout-name" name="fullName" type="text" autocomplete="name" minlength="2" maxlength="120" required>
+        </label>
+        <label>Phone
+          <input id="checkout-phone" name="phone" type="tel" autocomplete="tel" maxlength="16" required>
+        </label>
+        <label>Address
+          <input id="checkout-line1" name="line1" type="text" autocomplete="address-line1" minlength="5" maxlength="200" required>
+        </label>
+        <label>Apartment, suite, etc. (optional)
+          <input id="checkout-line2" name="line2" type="text" autocomplete="address-line2" maxlength="200">
+        </label>
+        <div class="admin-fields-row">
+          <label>City
+            <input id="checkout-city" name="city" type="text" autocomplete="address-level2" minlength="2" maxlength="100" required>
+          </label>
+          <label>State
+            <input id="checkout-state" name="state" type="text" autocomplete="address-level1" minlength="2" maxlength="100" required>
+          </label>
+        </div>
+        <label>PIN code
+          <input id="checkout-pincode" name="pincode" type="text" inputmode="numeric" autocomplete="postal-code" pattern="[0-9]{6}" maxlength="6" required>
+        </label>
+        <p class="admin-status" id="checkout-status" role="status" aria-live="polite"></p>
+        <button class="button button-dark" id="place-cod-order" type="submit">Place cash-on-delivery order</button>
+      </form>
+      <section class="checkout-confirmation" id="checkout-confirmation" aria-live="polite" hidden>
+        <h3>Order received</h3>
+        <p id="checkout-confirmation-text"></p>
+        <p>No payment is due until we confirm the order with you.</p>
+      </section>
     </dialog>
 
     <dialog class="viewer-dialog" id="viewer-dialog" aria-labelledby="viewer-title">
@@ -139,6 +183,14 @@
           <p id="admin-user"></p>
           <button class="text-button" id="admin-logout" type="button">Sign out</button>
         </div>
+        <section class="admin-orders" aria-labelledby="admin-orders-title">
+          <div class="admin-orders-heading">
+            <h3 id="admin-orders-title">Recent orders</h3>
+            <button class="text-button" id="refresh-orders" type="button">Refresh</button>
+          </div>
+          <p class="admin-status" id="admin-orders-status" role="status" aria-live="polite"></p>
+          <div class="admin-orders-list" id="admin-orders-list"></div>
+        </section>
         <label class="admin-product-select">Choose a product
           <select id="admin-product-select"></select>
         </label>

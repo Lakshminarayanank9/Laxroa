@@ -55,6 +55,157 @@ router.get('/products', async (_req, res, next) => {
   }
 });
 
+router.get('/orders', async (_req, res, next) => {
+  try {
+    const orders = await prisma.order.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        addressSnapshot: true,
+        status: true,
+        paymentStatus: true,
+        paymentMethod: true,
+        deliveryFeePaise: true,
+        totalPaise: true,
+        createdAt: true,
+        items: {
+          select: {
+            name: true,
+            unitPricePaise: true,
+            quantity: true,
+          },
+        },
+      },
+    });
+    res.json({ orders });
+  } catch (error) {
+    next(error);
+  }
+});
+
+const confirmOrderSchema = z.object({
+  deliveryFeePaise: z.number().int().min(0).max(1_000_000),
+}).strict();
+
+router.patch('/orders/:id/confirm', async (req, res, next) => {
+  try {
+    const { deliveryFeePaise } = confirmOrderSchema.parse(req.body);
+    const order = await prisma.$transaction(async (transaction) => {
+      const existingOrder = await transaction.order.findUnique({
+        where: { id: req.params.id },
+        select: {
+          id: true,
+          status: true,
+          paymentMethod: true,
+          items: {
+            select: { unitPricePaise: true, quantity: true },
+          },
+        },
+      });
+      if (!existingOrder) {
+        const error = new Error('Order not found.');
+        error.status = 404;
+        throw error;
+      }
+      if (existingOrder.status !== 'PENDING_CONFIRMATION' || existingOrder.paymentMethod !== 'COD') {
+        const error = new Error('This order is not awaiting delivery confirmation.');
+        error.status = 409;
+        throw error;
+      }
+
+      const subtotalPaise = existingOrder.items.reduce(
+        (total, item) => total + item.unitPricePaise * item.quantity,
+        0
+      );
+      const totalPaise = subtotalPaise + deliveryFeePaise;
+      if (!Number.isSafeInteger(totalPaise) || totalPaise > 2_147_483_647) {
+        const error = new Error('The confirmed order total is too large.');
+        error.status = 400;
+        throw error;
+      }
+
+      const confirmation = await transaction.order.updateMany({
+        where: {
+          id: req.params.id,
+          status: 'PENDING_CONFIRMATION',
+          paymentMethod: 'COD',
+        },
+        data: {
+          deliveryFeePaise,
+          totalPaise,
+          status: 'PROCESSING',
+        },
+      });
+      if (confirmation.count !== 1) {
+        const error = new Error('The order changed while it was being confirmed. Refresh and try again.');
+        error.status = 409;
+        throw error;
+      }
+
+      return transaction.order.findUnique({
+        where: { id: req.params.id },
+        select: { id: true, status: true, deliveryFeePaise: true, totalPaise: true },
+      });
+    });
+
+    return res.json({ order });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch('/orders/:id/cancel', async (req, res, next) => {
+  try {
+    const order = await prisma.$transaction(async (transaction) => {
+      const cancellation = await transaction.order.updateMany({
+        where: {
+          id: req.params.id,
+          status: { in: ['PENDING_CONFIRMATION', 'PROCESSING'] },
+          paymentStatus: 'CREATED',
+          paymentMethod: 'COD',
+        },
+        data: { status: 'CANCELLED' },
+      });
+
+      if (cancellation.count === 0) {
+        const existingOrder = await transaction.order.findUnique({
+          where: { id: req.params.id },
+          select: { id: true, status: true },
+        });
+        if (!existingOrder) {
+          const error = new Error('Order not found.');
+          error.status = 404;
+          throw error;
+        }
+        if (existingOrder.status === 'CANCELLED') return existingOrder;
+        const error = new Error('This order can no longer be cancelled.');
+        error.status = 409;
+        throw error;
+      }
+
+      const items = await transaction.orderItem.findMany({
+        where: { orderId: req.params.id },
+        select: { productId: true, quantity: true },
+      });
+      for (const item of items) {
+        await transaction.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: item.quantity } },
+        });
+      }
+      return transaction.order.findUnique({
+        where: { id: req.params.id },
+        select: { id: true, status: true },
+      });
+    });
+
+    return res.json({ order });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.post('/media', async (req, res, next) => {
   try {
     if (!env.cloudinaryReady) {

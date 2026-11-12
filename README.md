@@ -7,15 +7,22 @@ E-commerce project with a static storefront (`/frontend`) and REST API (`/backen
 - [ ] Step 2: customer auth (register, forgot/reset password); admin sign-in is available
 - [x] Step 3: public product catalog and admin price/image editing
 - [x] Step 4: ordered-frame 360-degree product viewer
-- [ ] Step 5: checkout (mandatory address) + Razorpay
+- [x] Step 5: guest checkout with mandatory delivery address + cash on delivery
 - [ ] Step 6: deployment + DNS
 
 ## Product admin and 360-degree images
 - Open **Admin** in the storefront and sign in with the account created by `npm run db:seed`.
 - Admins can update a product's name, description, price, stock, visibility, main image, and 360-degree frames.
+- Admins can review the latest 50 cash-on-delivery order requests in the same panel, confirm a delivery fee after calling the customer, and cancel an order to return its stock.
 - Product uploads use Cloudinary. Set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` in the backend environment.
 - Select numbered frame files such as `001.jpg`, `002.jpg`, and `003.jpg`; the storefront displays the 360° control when a product has at least two frames.
 - Product prices are entered in rupees and stored as integer paise.
+
+## Checkout
+- Guest checkout collects a delivery name, phone number, and Indian postal address; customers do not need an account.
+- Orders are priced from the live database and reserve available stock. They remain pending until an admin calls the customer, enters the delivery charge, and accepts the order. The customer pays the confirmed total on delivery.
+- Configure `ADMIN_EMAIL` and `ADMIN_PASSWORD`, run `npm run db:seed` once, and use that admin account to replace the sample products with real inventory before accepting orders.
+- Online payments are not enabled.
 
 ## Run the backend locally
 ```bash

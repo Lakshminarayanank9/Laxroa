@@ -15,7 +15,7 @@ const sessionDurationMs = 12 * 60 * 60 * 1000;
 const cookieOptions = {
   httpOnly: true,
   secure: env.isProd,
-  sameSite: 'lax',
+  sameSite: env.isProd ? 'none' : 'lax',
   path: '/',
 };
 

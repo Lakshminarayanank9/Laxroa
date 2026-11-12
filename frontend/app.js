@@ -37,17 +37,26 @@ let currentGallery = [];
 let currentSpinFrames = [];
 let activeAdminProductId = '';
 let adminFormDirty = false;
+let liveCatalogLoaded = false;
 let viewerFrames = [];
 let viewerFrameIndex = 0;
 let dragPosition = null;
 
 const productGrid = document.querySelector('#product-grid');
 const catalogStatus = document.querySelector('#catalog-status');
+const heroNote = document.querySelector('#hero-note');
 const cartCount = document.querySelector('#cart-count');
 const cartDialog = document.querySelector('#cart-dialog');
 const cartItems = document.querySelector('#cart-items');
 const cartSubtotal = document.querySelector('#cart-subtotal');
 const checkoutNote = document.querySelector('#checkout-note');
+const checkoutDialog = document.querySelector('#checkout-dialog');
+const checkoutForm = document.querySelector('#checkout-form');
+const checkoutSummary = document.querySelector('#checkout-summary');
+const checkoutStatus = document.querySelector('#checkout-status');
+const checkoutConfirmation = document.querySelector('#checkout-confirmation');
+const checkoutConfirmationText = document.querySelector('#checkout-confirmation-text');
+const placeOrderButton = document.querySelector('#place-cod-order');
 const viewerDialog = document.querySelector('#viewer-dialog');
 const viewerStage = document.querySelector('#viewer-stage');
 const viewerImage = document.querySelector('#viewer-image');
@@ -59,6 +68,8 @@ const adminLoginStatus = document.querySelector('#admin-login-status');
 const adminEditorStatus = document.querySelector('#admin-editor-status');
 const adminProductSelect = document.querySelector('#admin-product-select');
 const adminProductForm = document.querySelector('#admin-product-form');
+const adminOrdersStatus = document.querySelector('#admin-orders-status');
+const adminOrdersList = document.querySelector('#admin-orders-list');
 const adminSpinList = document.querySelector('#admin-spin-list');
 const adminCoverPreview = document.querySelector('#admin-cover-preview');
 const adminCoverEmpty = document.querySelector('#admin-cover-empty');
@@ -199,6 +210,24 @@ function renderCart() {
   }).join('');
 }
 
+function renderCheckoutSummary() {
+  const entries = [...cart.entries()];
+  const subtotal = entries.reduce((total, [id, quantity]) => {
+    const product = products.find((item) => item.id === id);
+    return total + (product?.pricePaise || 0) * quantity;
+  }, 0);
+  checkoutSummary.innerHTML = `
+    <ul class="checkout-summary-list">
+      ${entries.map(([id, quantity]) => {
+        const product = products.find((item) => item.id === id);
+        if (!product) return '';
+        return `<li><span>${escapeHtml(product.name)} × ${quantity}</span><strong>${currency.format(product.pricePaise * quantity / 100)}</strong></li>`;
+      }).join('')}
+    </ul>
+    <div class="checkout-total"><span>Product subtotal</span><strong>${currency.format(subtotal / 100)}</strong></div>
+  `;
+}
+
 async function loadProducts() {
   try {
     const response = await apiRequest('/api/products');
@@ -206,11 +235,17 @@ async function loadProducts() {
       throw new Error('The product API returned an invalid catalog.');
     }
     products = response.products;
+    liveCatalogLoaded = true;
     catalogStatus.textContent = 'Live catalog · Prices in INR';
+    heroNote.textContent = products.length === 0
+      ? 'Our first collection is coming soon.'
+      : 'Explore the Laxroa collection.';
   } catch (error) {
     products = [...sampleProducts];
+    liveCatalogLoaded = false;
     catalogStatus.textContent = 'Preview catalog — API unavailable; admin changes are not saved.';
     catalogStatus.title = error.message;
+    heroNote.textContent = 'Preview products are shown while the live catalog is unavailable.';
     console.warn('Product catalog is using preview data:', error.message);
   }
   renderProducts();
@@ -307,10 +342,74 @@ async function loadAdminProducts() {
   }
   adminProducts = response.products;
   products = adminProducts.filter((product) => product.active);
+  liveCatalogLoaded = true;
   catalogStatus.textContent = 'Live catalog · Prices in INR';
+  heroNote.textContent = products.length === 0
+    ? 'Our first collection is coming soon.'
+    : 'Explore the Laxroa collection.';
   renderProducts();
   renderCart();
   renderAdminProducts(activeAdminProductId);
+}
+
+function renderAdminOrders(orders) {
+  if (orders.length === 0) {
+    adminOrdersList.innerHTML = '<p class="empty-cart">No orders yet.</p>';
+    return;
+  }
+
+  adminOrdersList.innerHTML = orders.map((order) => {
+    const address = order.addressSnapshot || {};
+    const addressLines = [
+      address.line1,
+      address.line2,
+      [address.city, address.state, address.pincode].filter(Boolean).join(', '),
+    ].filter(Boolean);
+    const itemSummary = order.items
+      .map((item) => `${item.name} × ${item.quantity}`)
+      .join(', ');
+    const productSubtotal = order.items.reduce(
+      (total, item) => total + item.unitPricePaise * item.quantity,
+      0
+    );
+    const createdAt = new Date(order.createdAt).toLocaleString('en-IN');
+    const totalSummary = order.status === 'PENDING_CONFIRMATION'
+      ? `Products ${currency.format(productSubtotal / 100)} · Delivery charge and final total pending`
+      : `Total ${currency.format(order.totalPaise / 100)} · Delivery ${currency.format(order.deliveryFeePaise / 100)}`;
+    return `
+      <article class="admin-order">
+        <div class="admin-order-heading">
+          <strong>Order ${escapeHtml(order.id)}</strong>
+          <span>${escapeHtml(createdAt)}</span>
+        </div>
+        <p>${escapeHtml(itemSummary)}</p>
+        <p>${escapeHtml(totalSummary)} · Cash on delivery · ${escapeHtml(order.status)}</p>
+        <p>${escapeHtml(address.fullName)} · ${escapeHtml(address.phone)}</p>
+        <p>${addressLines.map(escapeHtml).join('<br>')}</p>
+        ${order.status === 'PENDING_CONFIRMATION' && order.paymentMethod === 'COD'
+          ? `<form class="admin-form admin-order-confirm" data-confirm-order="${escapeHtml(order.id)}">
+              <label>Delivery fee (₹)
+                <input name="deliveryFee" type="number" min="0" max="10000" step="0.01" value="${(order.deliveryFeePaise / 100).toFixed(2)}" required>
+              </label>
+              <button class="button button-dark" type="submit">Confirm after phone call</button>
+            </form>`
+          : ''}
+        ${['PENDING_CONFIRMATION', 'PROCESSING'].includes(order.status) && order.paymentStatus === 'CREATED' && order.paymentMethod === 'COD'
+          ? `<button class="text-button admin-order-cancel" type="button" data-cancel-order="${escapeHtml(order.id)}">Cancel and restock</button>`
+          : ''}
+      </article>
+    `;
+  }).join('');
+}
+
+async function loadAdminOrders() {
+  adminOrdersStatus.textContent = 'Loading orders…';
+  const response = await apiRequest('/api/admin/orders');
+  if (!Array.isArray(response?.orders)) {
+    throw new Error('The orders API returned an invalid order list.');
+  }
+  renderAdminOrders(response.orders);
+  adminOrdersStatus.textContent = `${response.orders.length} recent order${response.orders.length === 1 ? '' : 's'}.`;
 }
 
 async function showAdminEditor(user) {
@@ -326,6 +425,11 @@ async function showAdminEditor(user) {
     await loadAdminProducts();
   } catch (error) {
     adminEditorStatus.textContent = error.message;
+  }
+  try {
+    await loadAdminOrders();
+  } catch (error) {
+    adminOrdersStatus.textContent = error.message;
   }
 }
 
@@ -395,7 +499,17 @@ productGrid.addEventListener('click', (event) => {
   if (!button || button.disabled) return;
 
   const id = button.dataset.add;
-  cart.set(id, (cart.get(id) || 0) + 1);
+  const product = products.find((item) => item.id === id);
+  if (!product) return;
+  const quantity = cart.get(id) || 0;
+  if (quantity >= Math.min(10, product.stock)) {
+    button.textContent = 'Stock limit reached';
+    window.setTimeout(() => {
+      if (button.isConnected) button.textContent = 'Add to bag';
+    }, 900);
+    return;
+  }
+  cart.set(id, quantity + 1);
   renderCart();
   button.textContent = 'Added to bag';
   window.setTimeout(() => {
@@ -413,10 +527,64 @@ cartItems.addEventListener('click', (event) => {
 document.querySelector('#open-cart').addEventListener('click', () => cartDialog.showModal());
 document.querySelector('#close-cart').addEventListener('click', () => cartDialog.close());
 document.querySelector('#checkout-button').addEventListener('click', () => {
-  checkoutNote.textContent = 'Checkout is not connected yet. This preview does not accept orders.';
+  if (!liveCatalogLoaded) {
+    checkoutNote.textContent = 'Checkout is unavailable while the live catalog cannot be reached.';
+    return;
+  }
+  if (cart.size === 0) {
+    checkoutNote.textContent = 'Add a product to your bag before checking out.';
+    return;
+  }
+  checkoutForm.reset();
+  checkoutForm.hidden = false;
+  checkoutConfirmation.hidden = true;
+  checkoutStatus.textContent = '';
+  renderCheckoutSummary();
+  cartDialog.close();
+  checkoutDialog.showModal();
+});
+document.querySelector('#close-checkout').addEventListener('click', () => checkoutDialog.close());
+checkoutForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  placeOrderButton.disabled = true;
+  checkoutStatus.textContent = 'Placing your order…';
+  try {
+    const response = await apiRequest('/api/orders', {
+      method: 'POST',
+      body: JSON.stringify({
+        items: [...cart.entries()].map(([productId, quantity]) => ({ productId, quantity })),
+        address: {
+          fullName: document.querySelector('#checkout-name').value,
+          phone: document.querySelector('#checkout-phone').value,
+          line1: document.querySelector('#checkout-line1').value,
+          line2: document.querySelector('#checkout-line2').value,
+          city: document.querySelector('#checkout-city').value,
+          state: document.querySelector('#checkout-state').value,
+          pincode: document.querySelector('#checkout-pincode').value,
+        },
+      }),
+    });
+    if (!response?.order?.id) {
+      throw new Error('The order was not confirmed. Please try again.');
+    }
+
+    cart.clear();
+    renderCart();
+    checkoutForm.hidden = true;
+    checkoutConfirmation.hidden = false;
+    checkoutConfirmationText.textContent = `Order request ${response.order.id} received. We’ll call you to confirm the delivery charge and final total before accepting it.`;
+    checkoutStatus.textContent = '';
+  } catch (error) {
+    checkoutStatus.textContent = error.message;
+  } finally {
+    placeOrderButton.disabled = false;
+  }
 });
 cartDialog.addEventListener('click', (event) => {
   if (event.target === cartDialog) cartDialog.close();
+});
+checkoutDialog.addEventListener('click', (event) => {
+  if (event.target === checkoutDialog) checkoutDialog.close();
 });
 
 document.querySelector('#open-admin').addEventListener('click', openAdmin);
@@ -455,6 +623,58 @@ document.querySelector('#admin-logout').addEventListener('click', async () => {
     adminProductForm.reset();
   } catch (error) {
     adminEditorStatus.textContent = error.message;
+  }
+});
+
+document.querySelector('#refresh-orders').addEventListener('click', async () => {
+  try {
+    await loadAdminOrders();
+  } catch (error) {
+    adminOrdersStatus.textContent = error.message;
+  }
+});
+
+adminOrdersList.addEventListener('submit', async (event) => {
+  const form = event.target.closest('[data-confirm-order]');
+  if (!form) return;
+  event.preventDefault();
+
+  const button = form.querySelector('button[type="submit"]');
+  button.disabled = true;
+  adminOrdersStatus.textContent = 'Saving delivery charge…';
+  try {
+    const deliveryFeePaise = parsePricePaise(form.querySelector('[name="deliveryFee"]').value);
+    if (deliveryFeePaise > 1_000_000) {
+      throw new Error('Delivery fee must be ₹10,000 or less.');
+    }
+    await apiRequest(`/api/admin/orders/${encodeURIComponent(form.dataset.confirmOrder)}/confirm`, {
+      method: 'PATCH',
+      body: JSON.stringify({ deliveryFeePaise }),
+    });
+    await loadAdminOrders();
+    adminEditorStatus.textContent = 'Delivery charge saved and order accepted.';
+  } catch (error) {
+    adminOrdersStatus.textContent = error.message;
+    button.disabled = false;
+  }
+});
+
+adminOrdersList.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-cancel-order]');
+  if (!button || !window.confirm('Cancel this COD order and return its items to stock?')) return;
+
+  button.disabled = true;
+  adminOrdersStatus.textContent = 'Cancelling order…';
+  try {
+    await apiRequest(`/api/admin/orders/${encodeURIComponent(button.dataset.cancelOrder)}/cancel`, {
+      method: 'PATCH',
+    });
+    await loadAdminOrders();
+    if (!adminFormDirty) await loadAdminProducts();
+    adminEditorStatus.textContent = 'Order cancelled and stock restored.';
+  } catch (error) {
+    adminOrdersStatus.textContent = error.message;
+    button.disabled = false;
   }
 });
 
