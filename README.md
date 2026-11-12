@@ -15,7 +15,7 @@ E-commerce project with a static storefront (`/frontend`) and REST API (`/backen
 - Admin sign-in: https://www.qivra.co.in/admin
 - Sign in with the account created by `npm run db:seed`.
 - Admins can change their password while signed in or request an email reset from the admin sign-in screen.
-- The administrator email is the single admin sign-in ID. The admin sign-in screen can email this ID to that address using **Forgot user ID?**.
+- The single admin ID is `DIEGO`; the admin can also sign in with the account email. **Forgot user ID?** emails the ID to the admin recovery address.
 - Admins can add products, update a product's name, description, current price, optional original price, stock, visibility, main image, and 360-degree frames.
 - Products with order history are removed from the storefront but retained for those orders. Products with no order history can be deleted.
 - The customer storefront has no admin link; use the separate `/admin` URL.

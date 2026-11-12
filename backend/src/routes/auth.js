@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { env } from '../config/env.js';
-import { adminEmail } from '../config/admin.js';
+import { adminEmail, adminUserId } from '../config/admin.js';
 import { requireUser } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import { createPasswordResetToken, hashPasswordResetToken } from '../lib/password-reset.js';
@@ -12,7 +12,7 @@ const router = Router();
 const emailSchema = z.string().trim().email().max(254);
 const passwordSchema = z.string().min(10).max(128);
 const loginSchema = z.object({
-  email: emailSchema,
+  email: z.string().trim().min(1).max(254),
   password: z.string().min(1).max(128),
 });
 const registerSchema = z.object({
@@ -97,8 +97,8 @@ async function sendAdminUserIdEmail(email) {
       from: env.EMAIL_FROM,
       to: [email],
       subject: 'Your QIVRA admin sign-in ID',
-      text: `Your QIVRA admin sign-in ID is ${email}. If you did not request this reminder, you can ignore this email.`,
-      html: `<p>Your QIVRA admin sign-in ID is <strong>${email}</strong>.</p><p>If you did not request this reminder, you can ignore this email.</p>`,
+      text: `Your QIVRA admin sign-in ID is ${adminUserId}. You can also sign in with your account email. If you did not request this reminder, you can ignore this email.`,
+      html: `<p>Your QIVRA admin sign-in ID is <strong>${adminUserId}</strong>. You can also sign in with your account email.</p><p>If you did not request this reminder, you can ignore this email.</p>`,
     }),
   });
   if (!response.ok) {
@@ -131,12 +131,13 @@ router.post('/register', async (req, res, next) => {
 router.post('/login', async (req, res, next) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
-    });
+    const loginId = email.toLowerCase();
+    const user = loginId === adminUserId.toLowerCase()
+      ? await prisma.user.findFirst({ where: { email: adminEmail, role: 'ADMIN' } })
+      : await prisma.user.findUnique({ where: { email: loginId } });
 
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
-      return res.status(401).json({ error: 'Email or password is incorrect.' });
+      return res.status(401).json({ error: 'Email, user ID, or password is incorrect.' });
     }
 
     issueSession(res, user);

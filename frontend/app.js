@@ -867,7 +867,7 @@ document.querySelector('#admin-login-form').addEventListener('submit', async (ev
     const response = await apiRequest('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({
-        email: document.querySelector('#admin-email').value,
+          email: document.querySelector('#admin-login-id').value,
         password: document.querySelector('#admin-password').value,
       }),
     });
