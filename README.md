@@ -11,7 +11,9 @@ E-commerce project with a static storefront (`/frontend`) and REST API (`/backen
 - [ ] Step 6: deployment + DNS
 
 ## Product admin and 360-degree images
-- Open **Admin** in the storefront and sign in with the account created by `npm run db:seed`.
+- Customer storefront: https://laxroa.vercel.app/
+- Admin sign-in: https://laxroa.vercel.app/admin
+- Sign in with the account created by `npm run db:seed`.
 - Admins can update a product's name, description, price, stock, visibility, main image, and 360-degree frames.
 - Admins can review the latest 50 cash-on-delivery order requests in the same panel, confirm a delivery fee after calling the customer, and cancel an order to return its stock.
 - Product uploads use Cloudinary. Set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` in the backend environment.

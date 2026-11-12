@@ -24,6 +24,7 @@ const sampleProducts = [
 
 const configuredApiBase = document.querySelector('meta[name="api-base-url"]')?.content.trim().replace(/\/$/, '') || '';
 const isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const isAdminRoute = /^\/admin\/?$/.test(window.location.pathname);
 const apiBase = configuredApiBase || (isLocalHost ? 'http://localhost:4000' : '');
 const currency = new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -73,6 +74,8 @@ const adminOrdersList = document.querySelector('#admin-orders-list');
 const adminSpinList = document.querySelector('#admin-spin-list');
 const adminCoverPreview = document.querySelector('#admin-cover-preview');
 const adminCoverEmpty = document.querySelector('#admin-cover-empty');
+
+if (isAdminRoute) document.body.classList.add('admin-route');
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -587,10 +590,15 @@ checkoutDialog.addEventListener('click', (event) => {
   if (event.target === checkoutDialog) checkoutDialog.close();
 });
 
-document.querySelector('#open-admin').addEventListener('click', openAdmin);
-document.querySelector('#close-admin').addEventListener('click', () => adminDialog.close());
+document.querySelector('#close-admin').addEventListener('click', () => {
+  if (isAdminRoute) {
+    window.location.assign('/');
+  } else {
+    adminDialog.close();
+  }
+});
 adminDialog.addEventListener('click', (event) => {
-  if (event.target === adminDialog) adminDialog.close();
+  if (event.target === adminDialog && !isAdminRoute) adminDialog.close();
 });
 
 document.querySelector('#admin-login-form').addEventListener('submit', async (event) => {
@@ -831,4 +839,8 @@ viewerStage.addEventListener('keydown', (event) => {
 document.querySelector('#current-year').textContent = String(new Date().getFullYear());
 renderProducts();
 renderCart();
-loadProducts();
+if (isAdminRoute) {
+  openAdmin();
+} else {
+  loadProducts();
+}
