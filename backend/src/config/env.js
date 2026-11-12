@@ -9,7 +9,9 @@ const schema = z.object({
   CORS_ORIGINS: z.string().default('http://localhost:3000'),
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
   EMAIL_API_KEY: z.string().default(''),
-  EMAIL_FROM: z.string().default(''),
+  EMAIL_FROM: z.string()
+    .default('QIVRA <no-reply@qivra.co.in>')
+    .transform((value) => value.trim() || 'QIVRA <no-reply@qivra.co.in>'),
   CLOUDINARY_CLOUD_NAME: z.string().default(''),
   CLOUDINARY_API_KEY: z.string().default(''),
   CLOUDINARY_API_SECRET: z.string().default(''),
